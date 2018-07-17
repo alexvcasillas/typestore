@@ -1,7 +1,7 @@
 import { types } from "./types";
 import { crateModel } from "./models/crate-model";
 import { CrateboxModel } from "./models/cratebox-model";
-import { StoreModel, Model } from "./models/store-model";
+import { StoreModel, Model, DescriptionModel } from "./models/store-model";
 import { SubscriptionModel } from "./models/subscription-model";
 import { equal } from "./utils/fast-deep-equal";
 
@@ -22,28 +22,68 @@ const cratebox = function(): CrateboxModel {
   return {
     /**
      * This method describes a store based on a store model object.
-     * @param {object} storeModel
+     * @param {DescriptionModel} storeModel
      */
-    describeStore(storeModel: StoreModel): void {
+    describeStore(descriptionModel: DescriptionModel): void {
       // Check for store model object
-      if (typeof storeModel === "undefined") {
+      if (typeof descriptionModel === "undefined") {
         throw new Error(`You can't define a store without a store model object`);
       }
       // Check for the identifier
-      if (!storeModel.hasOwnProperty("identifier")) {
+      if (!descriptionModel.hasOwnProperty("identifier")) {
         throw new Error(`You can't describe a store without an identifier`);
       }
       // Check for the model
-      if (!storeModel.hasOwnProperty("model")) {
+      if (!descriptionModel.hasOwnProperty("model")) {
         throw new Error(`You can't describe a store without a model`);
       }
       // Check if we already have the given store described
-      if (descriptions.has(storeModel.identifier)) {
+      if (descriptions.has(descriptionModel.identifier)) {
         // If we do, then throw an error complaining about it :)
         throw new Error(`You can't describe a new store with the same identifier as a previously described one.`);
       }
+      // Before create lifecycle hook
+      if (
+        descriptionModel.hasOwnProperty("lifecycles") &&
+        typeof descriptionModel.lifecycles !== "undefined" &&
+        descriptionModel.lifecycles.hasOwnProperty("beforeCreate") &&
+        typeof descriptionModel.lifecycles.beforeCreate !== "undefined"
+      ) {
+        if (typeof descriptionModel.lifecycles.beforeCreate !== "function") {
+          throw new TypeError(
+            `Type ${typeof descriptionModel.lifecycles
+              .beforeCreate} is not a valid type for the beforeCreate lifecycle. Expected a function.`,
+          );
+        }
+        descriptionModel.lifecycles.beforeCreate();
+      }
       // If not, then we will set a new description based on the identifier and the model
-      descriptions.set(storeModel.identifier, { ...storeModel.model });
+      descriptions.set(descriptionModel.identifier, {
+        ...descriptionModel.model,
+      });
+      // Here we check if the description model has an initial state declared
+      if (descriptionModel.hasOwnProperty("initialState") && typeof descriptionModel.initialState !== "undefined") {
+        const initialDispatch: StoreModel = {
+          identifier: descriptionModel.identifier,
+          model: descriptionModel.initialState,
+        };
+        this.dispatch(initialDispatch);
+      }
+      // After create lifecycle hook
+      if (
+        descriptionModel.hasOwnProperty("lifecycles") &&
+        typeof descriptionModel.lifecycles !== "undefined" &&
+        descriptionModel.lifecycles.hasOwnProperty("afterCreate") &&
+        typeof descriptionModel.lifecycles.afterCreate !== "undefined"
+      ) {
+        if (typeof descriptionModel.lifecycles.afterCreate !== "function") {
+          throw new TypeError(
+            `Type ${typeof descriptionModel.lifecycles
+              .afterCreate} is not a valid type for the afterCreate lifecycle. Expected a function.`,
+          );
+        }
+        descriptionModel.lifecycles.afterCreate(this.getState(descriptionModel.identifier));
+      }
     },
     /**
      * This method returns all of the store descriptions in the store.
@@ -122,7 +162,7 @@ const cratebox = function(): CrateboxModel {
         }
         // Typecheck against the descriptor type-checker :)
         const checkResult = descriptor[key].checker(model[key]);
-        if (!checkResult) {
+        if (!checkResult.success) {
           throw new TypeError(checkResult.message);
         }
       });

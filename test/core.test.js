@@ -327,3 +327,107 @@ test("it should remove a subscription of the subscriptions to a specific store",
   second_unsubscribe();
   t.true(crate.getStoreSubscriptions("user").length === 1);
 });
+
+test("it should describe a store with an initial state", t => {
+  const crate = cratebox();
+  crate.describeStore({
+    identifier: "user",
+    model: {
+      name: types.string,
+      lastName: types.string,
+      age: types.number,
+    },
+    initialState: {
+      name: "Alex",
+      lastName: "Casillas",
+      age: 28,
+    },
+  });
+  t.deepEqual(crate.getState("user"), {
+    name: "Alex",
+    lastName: "Casillas",
+    age: 28,
+  });
+});
+
+test("it should throw a type error when defining initial state not as the model expected", t => {
+  const crate = cratebox();
+  const error = t.throws(
+    () =>
+      crate.describeStore({
+        identifier: "user",
+        model: {
+          name: types.string,
+          lastName: types.string,
+          age: types.number,
+        },
+        initialState: {
+          name: "Alex",
+          lastName: "Casillas",
+          age: "28",
+        },
+      }),
+    TypeError,
+  );
+  t.is(error.message, `Type "string" could not be assigned to type "number"`);
+});
+
+test("it should allow to use afterCreate lifecycle hook", t => {
+  const crate = cratebox();
+  crate.describeStore({
+    ...quickModel,
+    initialState: {
+      name: "Alex",
+      lastName: "Casillas",
+      age: 28,
+    },
+    lifecycles: {
+      beforeCreate: () => {},
+      afterCreate: model => {
+        t.deepEqual(model, { name: "Alex", lastName: "Casillas", age: 28 });
+      },
+    },
+  });
+});
+
+test("it should complain when not receiving a function at the beforeCreate lifecycle", t => {
+  const crate = cratebox();
+  const error = t.throws(
+    () =>
+      crate.describeStore({
+        ...quickModel,
+        initialState: {
+          name: "Alex",
+          lastName: "Casillas",
+          age: 28,
+        },
+        lifecycles: {
+          beforeCreate: "beforeCreate lifecycle hook",
+          afterCreate: () => {},
+        },
+      }),
+    TypeError,
+  );
+  t.is(error.message, "Type string is not a valid type for the beforeCreate lifecycle. Expected a function.");
+});
+
+test("it should complain when not receiving a function at the afterCreate lifecycle", t => {
+  const crate = cratebox();
+  const error = t.throws(
+    () =>
+      crate.describeStore({
+        ...quickModel,
+        initialState: {
+          name: "Alex",
+          lastName: "Casillas",
+          age: 28,
+        },
+        lifecycles: {
+          beforeCreate: () => {},
+          afterCreate: "afterCreate lifecycle hook",
+        },
+      }),
+    TypeError,
+  );
+  t.is(error.message, "Type string is not a valid type for the afterCreate lifecycle. Expected a function.");
+});
